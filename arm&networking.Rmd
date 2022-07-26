@@ -1,0 +1,283 @@
+---
+title: "ARM&Networking"
+author: "Zehui Wu"
+date: '2022-04-08'
+output: html_document
+---
+
+```{r}
+library(stringr) 
+library(dplyr)
+#install.packages("arules")
+library(arules)
+#install.packages("arulesViz")
+library(arulesViz)
+#install.packages("arulesViz")
+library(plotly)
+library(dplyr)
+library(visNetwork)
+#install.packages("visNetwork")
+library(igraph)
+library(ggplot2)
+library(tidyverse)
+#install.packages("networkD3")
+library(networkD3)
+
+
+
+```
+
+```{r}
+getwd()
+#options(scipen = 999)
+data <- read.csv("2021_retweet_track.csv")
+#data$status_id<- as.character(data$status_id)
+head(data) 
+nrow(data) ## only show 500 subset --> just a test 
+
+str(data)
+
+```
+```{r}
+
+data['avg_fact_score']<-cut(data$avg_fact_score,breaks=c(0,1,2,3,4,5))
+
+#data['status_id']<-str_c('status_id:',data$status_id)
+data['user_id']<-str_c('tweet_user_id:',data$user_id)
+data['truncated']<-str_c('truncated:',data$truncated)
+data['is_quote']<-str_c('quote:',data$is_quote)
+data['is_quote']<-str_c('quote:',data$is_quote)
+data['retweeted_user_id']<-str_c('retweeted_user_id:',data$retweeted_user_id)
+data['retweeted_user_screen_name']<-str_c('retweet:',data$retweeted_user_screen_name)
+data['screen_names']<-str_c('tweet:',data$screen_names)
+data['is_q']<-str_c('is_q:',data$is_q)
+data['is_bot']<-str_c('is_bot:',data$is_bot)
+data['avg_fact_score']<-str_c('avg_fact_score:',data$avg_fact_score)
+data['opinion_community']<-str_c('opinion_community:',data$opinion_community) ## q: what is the meaning of opinion community?
+
+
+#get rid of extra column:
+data<-select(data,-c("status_id","geo","retweeted_status_id","reply_status_id","reply_user_id"))
+head(data)
+
+
+## write it to txt dataset:
+write.table(data,'tweet_arm.txt',col.names=FALSE, row.names=FALSE) 
+```
+
+
+```{r}
+
+## to do arm analysis: 
+
+#text transactions to basket data
+tweet<-read.transactions(
+  "tweet_arm.txt",
+  format="basket",
+  header= FALSE,
+  sep=" ",
+  rm.duplicates = TRUE
+)
+inspect(tweet)
+
+
+
+```
+
+```{r}
+
+tweet_rules = arules::apriori(tweet, 
+                                   parameter = list(support=0.08, conf=0.6, minlen=2,target="rules"))
+inspect(tweet_rules)
+
+
+
+```
+```{r}
+##sort by support,confidence,lift:
+tweet_rules.sup<-sort(tweet_rules,by='support')
+rule.sup<- tweet_rules.sup[1:15,]
+tweet.sup.frame<-inspect(tweet_rules.sup[1:15])[,c(1,2,3,4,5,7)] #support
+
+tweet_rules.cof<-sort(tweet_rules,by='confidence')
+rule.cof<- tweet_rules.cof[1:15,]  
+tweet.cof.frame<-inspect(tweet_rules.cof[1:15])[,c(1,2,3,4,5,7)] #confidence
+
+tweet_rules.lift<-sort(tweet_rules,by='lift')
+rule.lift<- tweet_rules.lift[1:15,]  #lift
+
+write.csv(DATAFRAME(head(tweet_rules,by="support",n=15)),"support_top15.csv")
+write.csv(DATAFRAME(head(tweet_rules,by="confidence",n=15)),"onfidence_top15.csv")
+write.csv(DATAFRAME(head(tweet_rules,by="lift",n=15,decreasing=TRUE)),"lift_top15.csv")
+
+
+```
+
+```{r}
+########  Using NetworkD3 To View Results   ###########
+
+DATAFRAME(head(tweet_rules,by="support",n=15))
+DATAFRAME(head(tweet_rules,by="confidence",n=15))
+DATAFRAME(head(tweet_rules,by="lift",n=15)) 
+
+ggplot(DATAFRAME(head(tweet_rules,by="support",n=15)))+geom_point(aes(x=support,y=confidence,size=lift),shape=21,fill='yellow',color='black')+labs(title='The Top 15 CSBS_Support Rules')
+ggplot(DATAFRAME(head(tweet_rules,by="confidence",n=15)))+geom_point(aes(x=support,y=confidence,size=lift),shape=21,fill='green',color='black')+labs(title='The Top 15 CSBS_Confidence Rules')
+ggplot(DATAFRAME(head(tweet_rules,by="lift",n=15)))+geom_point(aes(x=support,y=confidence,size=lift),shape=21,fill='pink',color='black')+labs(title='The Top 15 CSBS_Lift Rules')
+
+
+```
+```{r}
+### D3 visulizations:
+###### Do for SUp, Conf, and Lift   #######
+
+## USING SUP
+Rules_S<-DATAFRAME(head(tweet_rules,by="support",n=15))[c(1,2,3)]
+names(Rules_S) <- c("SourceName", "TargetName", "Weight")
+head(Rules_S,15)
+
+## USING CONF
+Rules_C<-DATAFRAME(head(tweet_rules,by="confidence",n=15))[c(1,2,4)]
+names(Rules_C) <- c("SourceName", "TargetName", "Weight")
+head(Rules_C,15)
+
+## USING LIFT
+Rules_L<-DATAFRAME(head(tweet_rules,by="lift",n=15))[c(1,2,6)]
+names(Rules_L) <- c("SourceName", "TargetName", "Weight")
+head(Rules_L,15)
+
+## Choose and set: 轮流
+#Rules<-Rules_S
+#Rules<-Rules_C ## reset to confidence rule
+Rules<-Rules_L
+
+
+
+```
+
+
+```{r}
+#############       Build a NetworkD3 edgeList and nodeList    ############
+## for support & confidence & lift: need to reset the former definition of "Rules<-Rules_L" to fit corresponding models.
+edgeList<-Rules
+# Create a graph. Use simplyfy to ensure that there are no duplicated edges or self loops
+MyGraph <- igraph::simplify(igraph::graph.data.frame(edgeList, directed=TRUE))
+plot(MyGraph)
+
+nodeList <- data.frame(ID = c(0:(igraph::vcount(MyGraph) - 1)), 
+                       # because networkD3 library requires IDs to start at 0
+                       nName = igraph::V(MyGraph)$name)
+## Node Degree
+(nodeList <- cbind(nodeList, nodeDegree=igraph::degree(MyGraph, 
+                                                       v = igraph::V(MyGraph), mode = "all")))
+
+## Betweenness
+BetweenNess <- igraph::betweenness(MyGraph, 
+                                   v = igraph::V(MyGraph), 
+                                   directed = TRUE) 
+
+(nodeList <- cbind(nodeList, nodeBetweenness=BetweenNess))
+
+## This can change the BetweenNess value if needed
+#BetweenNess<-BetweenNess/100
+
+
+
+```
+```{r}
+########## BUILD THE EDGES #####################################################
+## for support & confidence & lift: need to reset the former definition of "Rules<-Rules_S" & "Rules<-Rules_L" to fit corresponding models.
+getNodeID <- function(x){
+  which(x == igraph::V(MyGraph)$name) - 1  #IDs start at 0
+}
+## UPDATE THIS !! depending on # choice
+(getNodeID("Category")) 
+
+edgeList <- plyr::ddply(
+  Rules, .variables = c("SourceName", "TargetName" , "Weight"), 
+  function (x) data.frame(SourceID = getNodeID(x$SourceName), 
+                          TargetID = getNodeID(x$TargetName)))
+
+head(edgeList)
+nrow(edgeList)
+##############  Dice Sim ################################################
+DiceSim <- igraph::similarity.dice(MyGraph, vids = igraph::V(MyGraph), mode = "all")
+head(DiceSim)
+F1 <- function(x) {data.frame(diceSim = DiceSim[x$SourceID +1, x$TargetID + 1])}
+
+head(edgeList)
+edgeList <- plyr::ddply(edgeList,
+                        .variables=c("SourceName", "TargetName", "Weight", 
+                                     "SourceID", "TargetID"), 
+                        function(x) data.frame(F1(x)))
+head(edgeList)
+
+
+
+
+```
+```{r}
+
+##################   color #################################################
+
+D3_network_Tweets <- networkD3::forceNetwork(
+  Links = edgeList, # data frame that contains info about edges
+  Nodes = nodeList, # data frame that contains info about nodes
+  Source = "SourceID", # ID of source node 
+  Target = "TargetID", # ID of target node
+  Value = "Weight", # value from the edge list (data frame) that will be used to value/weight relationship amongst nodes
+  NodeID = "nName", # value from the node list (data frame) that contains node description we want to use (e.g., node name)
+  Nodesize = "nodeBetweenness",  # value from the node list (data frame) that contains value we want to use for a node size
+  Group = "nodeDegree",  # value from the node list (data frame) that contains value we want to use for node color
+  height = 700, # Size of the plot (vertical)
+  width = 900,  # Size of the plot (horizontal)
+  fontSize = 20, # Font size
+  linkDistance = networkD3::JS("function(d) { return d.value*1000; }"), # Function to determine distance between any two nodes, uses variables already defined in forceNetwork function (not variables from a data frame)
+  linkWidth = networkD3::JS("function(d) { return d.value*5; }"),# Function to determine link/edge thickness, uses variables already defined in forceNetwork function (not variables from a data frame)
+  opacity = 5, # opacity
+  zoom = TRUE, # ability to zoom when click on the node
+  opacityNoHover = 5, # opacity of labels when static
+  linkColour = "red"   ###"edges_col"red"# edge colors
+) 
+
+networkD3::saveNetwork(D3_network_Tweets, 
+                       "Lift_Network.html", selfcontained = TRUE)
+
+```
+
+```{r}
+
+
+######## for plot
+#support 
+subrules <- head(rule.sup, n = 15,by='support')
+p <- plot(subrules, method = "graph",  engine = "htmlwidget")
+p
+htmlwidgets::saveWidget(as_widget(p), "Support_Web_network_TOP15.html")
+#print("finished")
+
+p2 <- plot(subrules, engine = "plotly")
+htmlwidgets::saveWidget(as_widget(p2), "Support_Scatter_network_TOP15.html")
+
+
+#confidence:
+subrules <- head(rule.cof, n = 15,by='confidence')
+p_cof <- plot(subrules, method = "graph",engine = "htmlwidget")
+htmlwidgets::saveWidget(as_widget(p_cof), "Confidence_Web_network_TOP15.html")
+print("finished")
+
+p2 <- plot(subrules, engine = "plotly")
+htmlwidgets::saveWidget(as_widget(p2), "Confidence_Scatter_network_TOP15.html")
+
+#lift:
+subrules <- head(rule.lift, n = 15,by='lift')
+p_lift <- plot(subrules, method = "graph",engine = "htmlwidget")
+htmlwidgets::saveWidget(as_widget(p_lift), "Lift_Web_network_TOP15.html")
+#print("finished")
+
+p2 <- plot(subrules, engine = "plotly")
+htmlwidgets::saveWidget(as_widget(p2), "Lift_Scatter_network_TOP15.html")
+
+#finished 
+```
+
+

@@ -1,0 +1,16 @@
+"","LHS","RHS","support","confidence","coverage","lift","count"
+"1","{retweet:clairecmc}","{retweeted_user_id:16160352}",0.084,1,0.084,11.9047619047619,42
+"2","{retweeted_user_id:16160352}","{retweet:clairecmc}",0.084,1,0.084,11.9047619047619,42
+"3","{retweet:clairecmc}","{opinion_community:0}",0.084,1,0.084,1.08695652173913,42
+"4","{retweet:clairecmc}","{is_bot:FALSE}",0.084,1,0.084,1.05708245243129,42
+"5","{retweet:clairecmc}","{is_q:FALSE}",0.084,1,0.084,1.05042016806723,42
+"6","{retweet:clairecmc}","{avg_fact_score:(4,5]}",0.084,1,0.084,1.04602510460251,42
+"7","{retweet:clairecmc}","{truncated:FALSE}",0.084,1,0.084,1.04602510460251,42
+"8","{retweeted_user_id:16160352}","{opinion_community:0}",0.084,1,0.084,1.08695652173913,42
+"9","{retweeted_user_id:16160352}","{is_bot:FALSE}",0.084,1,0.084,1.05708245243129,42
+"10","{retweeted_user_id:16160352}","{is_q:FALSE}",0.084,1,0.084,1.05042016806723,42
+"11","{retweeted_user_id:16160352}","{avg_fact_score:(4,5]}",0.084,1,0.084,1.04602510460251,42
+"12","{retweeted_user_id:16160352}","{truncated:FALSE}",0.084,1,0.084,1.04602510460251,42
+"15","{quote:quote:TRUE}","{is_q:FALSE}",0.322,1,0.322,1.05042016806723,161
+"16","{quote:quote:TRUE}","{avg_fact_score:(4,5]}",0.322,1,0.322,1.04602510460251,161
+"17","{quote:quote:TRUE}","{truncated:FALSE}",0.322,1,0.322,1.04602510460251,161
